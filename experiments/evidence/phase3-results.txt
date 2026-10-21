@@ -1,0 +1,10 @@
+Secure Notes Mini Phase 3 probes; in-memory synthetic data only
+Command: .venv/bin/python -m experiments.run
+CWE-862 vulnerable: Alice read owner=bob content=Synthetic Bob note
+CWE-862 fixed: Alice denied=True
+CWE-89 vulnerable: injected search returned owners=['alice', 'bob']
+CWE-89 fixed: parameterized search returned owners=[]
+CWE-20 vulnerable: accepted_chars=4001
+CWE-20 fixed: oversized note rejected=True
+Composition vulnerable: Alice received Bob report=True
+Composition fixed: Notes reauthorization denied Alice=True

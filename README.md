@@ -66,4 +66,4 @@ Tests use temporary SQLite files and synthetic credentials. The suite covers log
 - API and Notes use separate SQLite files. Report has no database access. Services communicate over loopback HTTP in this local-only setup; deploy beyond one trusted machine only with authenticated TLS and protected key handling.
 - Seed passwords are supplied through ignored `.env`; the account names and roles are synthetic. Do not expose the demo services to a public network.
 
-Vulnerability experiments, Jenkins CI, deployment hardening and the academic Overleaf report are not part of the current implementation phase. See `docs/` for the plan and experiment design. Do not treat planned or unexecuted checks as completed evidence.
+See `experiments/README.md` for the four controlled vulnerable/fixed probes and their captured local evidence. Jenkins CI, deployment hardening and the academic Overleaf report remain unfinished. Do not treat planned or unexecuted checks as completed evidence.
