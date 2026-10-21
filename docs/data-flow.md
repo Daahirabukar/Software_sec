@@ -6,7 +6,7 @@
 - **TB2 API → Notes:** API sends a short-lived HMAC-authenticated authority. Notes verifies subject, caller, audience, action, resource, issue time and expiry and independently filters data by owner.
 - **TB3 API → Report:** API sends only Notes-authorized records and a grant bound to their exact input digest, subject and username. Report verifies the grant and formats those records only.
 - **TB4 Services → SQLite:** API and Notes open only their own SQLite database. Report has no database connection.
-- **TB5 Helper/dependencies → build/runtime:** Report imports the separately installable helper; dependency installation and scanning are planned for CI.
+- **TB5 Helper/dependencies → build/runtime:** Report imports the separately installable helper; GitHub Actions installs it and scans the installed dependency environment.
 
 ## Report sequence
 

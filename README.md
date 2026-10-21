@@ -59,6 +59,27 @@ Send `POST /reports` with `{"note_ids":["<owned-note-uuid>"]}` to generate a rep
 
 Tests use temporary SQLite files and synthetic credentials. The suite covers login, note ownership, scoped service authorization, report identity/input binding, Admin restrictions, disabled sessions, input limits, helper formatting, and an HTTP workflow across three real Uvicorn processes.
 
+## GitHub Actions CI and security gates
+
+`.github/workflows/ci.yml` runs on every push and pull request on a fresh GitHub-hosted `ubuntu-latest` runner. The assignment brief names Jenkins, but the lecturer clarified that the assignment is technology agnostic and focuses on understanding the complete CI/CD pipeline; this project uses GitHub Actions to satisfy that clarified requirement. The workflow uses read-only repository permissions and needs no project secrets.
+
+The workflow installs the application and separately installable helper package plus CI dependencies, checks installed dependency consistency, runs Bandit (medium/high findings block), runs pip-audit (known vulnerable dependencies block), runs the complete pytest suite including the real three-process HTTP workflow, and executes all four vulnerable/fixed experiment demonstrations. The fresh runner is the isolated test environment. JUnit and scanner/experiment outputs are uploaded even if an earlier gate fails, when those files exist. Any failing install, scanner, test, or experiment command fails the job.
+
+Equivalent local commands after installation are:
+
+```sh
+.venv/bin/python -m pip install --upgrade "pip>=26.2"
+.venv/bin/python -m pip install -r requirements-dev.txt -r requirements-ci.txt
+.venv/bin/python -m pip check
+mkdir -p artifacts/experiments
+.venv/bin/bandit -r services packages -x "*/build/*,*/dist/*" -ll -f json -o artifacts/bandit.json
+.venv/bin/python -m pip_audit --format json --output artifacts/pip-audit.json --cache-dir artifacts/pip-audit-cache
+.venv/bin/python -m pytest -q -p no:cacheprovider --junitxml=artifacts/junit.xml
+.venv/bin/python -m experiments.run > artifacts/experiments/phase3-results.txt
+```
+
+Bandit intentionally scans only the secure application and installed helper; controlled vulnerable fixtures are separately tested and retained under `experiments/`. Local command results do not constitute a GitHub Actions run. The workflow must be observed on GitHub after the repository is hosted and the workflow is pushed.
+
 ## Current security boundaries and limitations
 
 - Passwords use Argon2id; user sessions are random opaque bearer values with a 15-minute in-memory lifetime. Active account state is checked on each request.
@@ -66,4 +87,4 @@ Tests use temporary SQLite files and synthetic credentials. The suite covers log
 - API and Notes use separate SQLite files. Report has no database access. Services communicate over loopback HTTP in this local-only setup; deploy beyond one trusted machine only with authenticated TLS and protected key handling.
 - Seed passwords are supplied through ignored `.env`; the account names and roles are synthetic. Do not expose the demo services to a public network.
 
-See `experiments/README.md` for the four controlled vulnerable/fixed probes and their captured local evidence. Jenkins CI, deployment hardening and the academic Overleaf report remain unfinished. Do not treat planned or unexecuted checks as completed evidence.
+See `experiments/README.md` for the four controlled vulnerable/fixed probes and their captured local evidence. GitHub Actions, deployment hardening and the academic Overleaf report remain unfinished until verified in their respective environments. Do not treat planned or unexecuted checks as completed evidence.

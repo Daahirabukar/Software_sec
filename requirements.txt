@@ -1,6 +1,3 @@
-argon2-cffi>=23.1,<26
-fastapi>=0.115,<1
-httpx>=0.28,<1
-uvicorn>=0.34,<1
+-r requirements-runtime.txt
 .
 ./packages/secure-notes-helper

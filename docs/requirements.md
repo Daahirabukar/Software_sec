@@ -24,10 +24,12 @@ Source: local Software Security Assignment I (6 pages; SHA-256 efb4f3462df8cabae
 - [x] Commit the initial four-phase SSDLC plan before application features. Verified as commit `0aa087c` before any feature files were created.
 - [x] Include requirements/scope, architecture/data flow, asset register, trust boundaries, STRIDE, access-control matrix, tests, and gate decisions in the Phase 1 documents.
 - [x] Plant and investigate three catalog vulnerabilities plus one distinct cross-component composition vulnerability; show vulnerable behavior, impact, mitigation, regression, and actual local evidence. See `experiments/` and `docs/vulnerability-plan.md`.
-- [ ] Jenkins runs for pushes and pull requests; build/install, static scan, dependency scan, create a fresh test environment, run functional/authorization tests, archive evidence, and fail on blocking findings. Jenkinsfile and actual Jenkins execution are not implemented yet.
+- [x] GitHub Actions workflow implements push/PR CI on a fresh hosted runner, clean build/install, Bandit, pip-audit, full tests/experiments, archived evidence, and blocking gates. Local pipeline-equivalent commands are verified; a real GitHub Actions run is pending repository hosting and push.
 - [ ] Report production-release considerations and maintain an accurate AI-use declaration in the separate academic report.
-- [x] README gives current exact install, seed, run, and test commands. Jenkins and experiment reproduction instructions remain to be added in later phases.
-- [ ] Complete Jenkinsfile/security gates and Overleaf report before submission; the four experiment probes and evidence are complete.
+- [x] README gives current exact install, seed, run, test, CI and experiment reproduction commands.
+- [ ] Verify GitHub Actions on a hosted repository and complete the Overleaf report; the four experiment probes and local evidence are complete.
+
+The brief explicitly specifies a Jenkins pipeline (pages 5–6). The lecturer clarified that the assignment is technology agnostic and assesses understanding of the complete CI/CD pipeline; GitHub Actions is used under that clarification.
 
 ## Out of scope
 
