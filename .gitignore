@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local configuration and test data
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+*.key
+*.pem
+artifacts/
