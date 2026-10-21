@@ -1,36 +1,69 @@
 # Secure Notes Mini
 
-A small, three-process university project for Software Security Assignment I. **Current state: Phase 1 planning only; application code has not started.**
+A small local demonstration project with three independent FastAPI processes: API Service (authentication and orchestration), Notes Service (SQLite note ownership), and Report Service (report formatting through the separately installable `secure-notes-helper` package).
 
-The proposed application has an API Service for login and coordination, a Notes Service that owns and authorizes notes, and a Report Service that obtains narrowly authorized notes over HTTP and formats a report through the separately installable secure-notes-helper package. Alice and Bob are ordinary users. Admin can disable ordinary accounts, but cannot read their notes.
+## Setup
 
-The initial security plans are in docs/. They were prepared before application implementation. Do not begin feature work until this planning state has been committed and reviewed.
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+cp .env.example .env
+```
 
-## Planned local workflow
+Edit `.env`: replace both service-secret placeholders with different random values of at least 32 characters and set three different local-only passwords of at least 12 characters for Alice, Bob and Admin. The API hashes seeded passwords with Argon2id. Never reuse real credentials. `.env` and SQLite files are ignored by Git.
 
-The eventual setup is intended to use a Python virtual environment, install the project and local helper, seed synthetic accounts, and start three independent FastAPI processes. Exact commands will be added with the implementation rather than presented as already working. Tests will use temporary SQLite databases and synthetic credentials.
+## Run the services
 
-## Planned checks
+From the project root, load `.env` in each terminal and remove credentials that process does not need. Notes receives only its own HMAC key and database path; Report receives only its own HMAC key; API receives both downstream keys and seed credentials.
 
-- Functional and role/ownership tests with pytest.
-- Three-process HTTP report workflow.
-- Isolated vulnerable/fixed experiments from the official catalog.
-- Jenkins build, static/dependency scans, clean test environment, archived evidence, and blocking gates.
+```sh
+set -a; source .env; set +a
+unset API_REPORTS_SECRET API_DB NOTES_SERVICE_URL REPORTS_SERVICE_URL \
+  SEED_ALICE_PASSWORD SEED_BOB_PASSWORD SEED_ADMIN_PASSWORD
+.venv/bin/uvicorn services.notes.main:create_app --factory --host 127.0.0.1 --port 8002
+```
 
-No services, tests, Jenkinsfile, helper package, or vulnerability mutations exist in this planning phase. The academic report will be maintained separately in Overleaf.
+```sh
+set -a; source .env; set +a
+unset API_NOTES_SECRET API_DB NOTES_DB NOTES_SERVICE_URL REPORTS_SERVICE_URL \
+  SEED_ALICE_PASSWORD SEED_BOB_PASSWORD SEED_ADMIN_PASSWORD
+.venv/bin/uvicorn services.reports.main:create_app --factory --host 127.0.0.1 --port 8003
+```
 
-## Proposed minimal project structure
+In a third terminal load `.env` without unsetting values, then start API:
 
-This is a proposal only; the directories below are not created in Phase 1.
+```sh
+set -a; source .env; set +a
+.venv/bin/uvicorn services.api.main:create_app --factory --host 127.0.0.1 --port 8001
+```
 
-    pyproject.toml
-    Jenkinsfile
-    services/api/       login, user store, orchestration, Admin route
-    services/notes/     note API, owner checks, notes SQLite
-    services/reports/   report HTTP endpoint and helper use
-    packages/secure-notes-helper/
-    tests/              functional, authorization, and process tests
-    experiments/        isolated mutation runner and probes
-    docs/               planning, evidence, final submission notes
+Stop each process with Ctrl+C. The API seeds `alice`, `bob` and `admin` at first startup; each account receives the password set in `.env`. The API's opaque bearer sessions are held in process memory, so run one API worker and restart to clear sessions. Internal services bind to loopback in this local setup.
 
-Keep service code separate by process, helper code in its own installable package, and experiment mutations out of normal service startup.
+## Example workflow
+
+```sh
+TOKEN=$(curl -s http://127.0.0.1:8001/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"YOUR_LOCAL_ALICE_PASSWORD"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+curl -s http://127.0.0.1:8001/notes -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"title":"Study","content":"Synthetic note"}'
+curl -s http://127.0.0.1:8001/notes -H "Authorization: Bearer $TOKEN"
+```
+
+Send `POST /reports` with `{"note_ids":["<owned-note-uuid>"]}` to generate a report. `POST /admin/users/{username}/disable` is Admin-only; Admin has no note or report permissions. FastAPI interactive API docs are available at `http://127.0.0.1:8001/docs` while running locally.
+
+## Tests
+
+```sh
+.venv/bin/python -m pytest -q -p no:cacheprovider
+```
+
+Tests use temporary SQLite files and synthetic credentials. The suite covers login, note ownership, scoped service authorization, report identity/input binding, Admin restrictions, disabled sessions, input limits, helper formatting, and an HTTP workflow across three real Uvicorn processes.
+
+## Current security boundaries and limitations
+
+- Passwords use Argon2id; user sessions are random opaque bearer values with a 15-minute in-memory lifetime. Active account state is checked on each request.
+- API and each downstream service share a different HMAC-SHA256 service key. Each short-lived (30-second) authority binds subject, username, caller, audience, action, exact resource or report-input digest, and expiry. Notes also checks owner identity on every read. Authority keys and user sessions are local-demo controls, not a production identity system.
+- API and Notes use separate SQLite files. Report has no database access. Services communicate over loopback HTTP in this local-only setup; deploy beyond one trusted machine only with authenticated TLS and protected key handling.
+- Seed passwords are supplied through ignored `.env`; the account names and roles are synthetic. Do not expose the demo services to a public network.
+
+Vulnerability experiments, Jenkins CI, deployment hardening and the academic Overleaf report are not part of the current implementation phase. See `docs/` for the plan and experiment design. Do not treat planned or unexecuted checks as completed evidence.

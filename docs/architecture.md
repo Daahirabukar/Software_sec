@@ -1,23 +1,31 @@
 # Architecture
 
-## Proposed components
+## Implemented components
 
 | Process | Responsibility | Data and permissions |
 |---|---|---|
-| API Service | Login, user-role checks, note/report request coordination, restricted Admin operation | Own SQLite user database; may issue short-lived, narrowly scoped service authorities |
-| Notes Service | Own note storage and enforce ownership for every note read/write | Own SQLite notes database; accepts only authenticated, scoped service requests |
-| Report Service | Fetch specifically authorized notes from Notes over HTTP and format a text report | No note database; uses the installed helper package; no authority to select unapproved notes |
+| API Service | Argon2id login, in-memory user sessions, role checks, orchestration, restricted account disable | Own SQLite user database; issues narrow service authorities |
+| Notes Service | Create, list and read notes; enforce ownership at each read | Own SQLite notes database; accepts only API-authorized requests |
+| Report Service | Format the exact notes provided by API | No database; imports the independently installable `secure-notes-helper` package |
 
-The database files do not count as application components. All three services are separate processes, not modules inside one server. The Report Service calls Notes; the API coordinates the report request and returns the result to the user.
+Each service has its own FastAPI application factory and runs as a separate Uvicorn process. SQLite files are owned by their respective services. Report has no note-database access.
 
-## Identity and service authority
+## Authentication and delegated service authority
 
-The API authenticates users and issues client access tokens. User-token signing material is API-only. Service authority uses distinct per-destination keys that are not the client-token key. A short-lived signed authority includes subject (sub), issuer/caller (iss/act), audience (aud), action, exact resource or selected note IDs, issue time, and expiry. API grants Report only report creation for an explicit selection; it gives Report only API-signed per-note read authorities for those exact note IDs. Report can forward those authorities but cannot mint or broaden them. Notes verifies the signature, audience, action, caller, expiry, and exact note scope, then independently checks that the note owner equals the subject. Missing or invalid authority denies.
+The API stores Argon2id hashes for the synthetic accounts and issues random opaque bearer sessions valid for 15 minutes. Seed passwords must be at least 12 characters and are supplied through environment variables. Session state is in memory; account active status is checked on every authenticated request. This intentionally small implementation supports one API process and is not a distributed session design.
 
-These are design decisions, not implemented controls. Token lifetime, key loading, and local transport settings will be fixed and tested during implementation. Local HTTP is acceptable only on loopback for synthetic development; production would require authenticated TLS or an equivalent protected channel.
+The API and each downstream service share a distinct HMAC-SHA256 key for that service boundary. A 30-second authority contains the authenticated subject and username, caller (`api`), destination audience (`notes` or `reports`), action, exact resource scope, issue time and expiry. Notes verifies all claims, then independently queries by both note ID and owner ID. Create and list grants are limited to their named collection operation. Report verifies its grant against a digest of the exact note IDs and content supplied by API. Missing or invalid authority is denied. No client-supplied owner ID is accepted.
 
-## Storage and assumptions
+Keys and seed passwords come from ignored local `.env` configuration; there are no source-code credentials. This is suitable only for a local synthetic-data demonstration. HMAC keys are not asymmetric identities, local HTTP is not suitable outside loopback, and production use would require authenticated TLS, managed secrets and key rotation.
 
-API SQLite stores seeded user IDs, Argon2id password hashes, role, and active status. Notes SQLite stores note UUID, owner UUID, title, content, and timestamps. Report output is generated for the current request and returned through the API; no queue or persistent report database is planned.
+## Report workflow
 
-Assumptions: service ports are not exposed to untrusted networks; secrets are outside Git; the API is the user identity authority; Notes is the ownership authority; the helper formats only the notes given to it. Trust boundaries and flows are in data-flow.md.
+1. Alice or Bob logs in to API and receives a short-lived opaque session.
+2. The user sends `POST /reports` with note UUIDs.
+3. API authenticates the user and requests each note from Notes using a short-lived, note-specific read authority.
+4. Notes verifies API authority and independently checks note ownership; foreign and missing note IDs return the same not-found result.
+5. API sends the returned records to Report with a report-create authority bound to their SHA-256 input digest and the authenticated subject/username.
+6. Report verifies the service grant and identity binding, then calls the separately installed helper to format only the submitted records.
+7. API returns the report to the user.
+
+The user cannot set note ownership, and the Report Service cannot select or fetch additional records. No cross-user report cache or persistent report store exists.

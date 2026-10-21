@@ -1,9 +1,9 @@
 # Secure design principles
 
-| Principle | Design decision | Enforcement point | Planned evidence |
+| Principle | Implemented decision | Enforcement point | Evidence |
 |---|---|---|---|
-| Least privilege | Admin only disables ordinary accounts; Report receives a fixed note selection; Notes grants no database access to other services | API role checks, scoped authority, Notes ownership query | Admin restriction tests; attempts to add another note ID fail |
-| Complete mediation | Ownership is checked by Notes on every read, including requests routed through Report | Notes HTTP endpoint and owner-filtered database query | Alice/Bob direct and report-workflow negative tests |
-| Fail-safe defaults | Missing, malformed, expired, wrong-action, wrong-audience, or out-of-scope authority is denied | Service authentication dependencies and request validation | Missing/invalid authority and malformed-input tests |
+| Least privilege | Admin can disable ordinary accounts only; Report receives exact already-authorized notes; each service has its own database | API role checks, report digest scope, service boundaries | `test_admin_is_restricted...`; `test_owner_isolation...` |
+| Complete mediation | Notes checks ownership for every note read, including report reads initiated by API | Notes query filters by note ID and verified subject | `test_owner_isolation_and_report_workflow_across_three_services` |
+| Fail-safe defaults | Missing credentials, invalid sessions, malformed/expired/out-of-scope authorities, or invalid data are rejected | API auth dependency, Notes authority verifier, Pydantic request models | `test_login_identity_and_generic_failure`; `test_notes_service_rejects...`; `test_service_fails_closed...`; input bounds test |
 
-These are planned controls. The report will distinguish decisions, implementation, tests, and actual results.
+These controls are implemented and exercised by pytest. Vulnerability-specific evidence, scanning gates, Jenkins runs, and production deployment hardening remain planned work.

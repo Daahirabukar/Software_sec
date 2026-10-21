@@ -1,26 +1,27 @@
 # Access-control matrix
 
-Default deny: a permission exists only where explicitly granted. User-facing operations require a valid, unexpired token and an active account.
+Default deny: an operation is allowed only where explicitly granted. User endpoints require a valid unexpired session and an active account.
 
 ## User permissions
 
 | Operation | Alice | Bob | Admin |
 |---|---|---|---|
 | Login / read own identity | Allow | Allow | Allow |
-| Create note | Own as Alice | Own as Bob | Deny |
+| Create note | Own account | Own account | Deny |
 | List/read notes | Alice-owned only | Bob-owned only | Deny |
-| Generate report | Own notes only | Own notes only | Deny |
+| Generate report | Own authorized notes | Own authorized notes | Deny |
 | Disable ordinary account | Deny | Deny | Allow; cannot disable Admin |
 
-Identifiers supplied by a user do not establish ownership. Notes checks ownership on every resource read, including reads initiated by Report. Admin privilege is limited to disabling ordinary accounts; it does not grant access to notes or reports.
+API obtains identity from the authenticated session, never an owner parameter. Notes enforces ownership for every read, including reads used for reports. Disabling an account prevents both new login and use of existing sessions.
 
 ## Service permissions
 
-| Caller → service | Allowed action | Scope and enforcement |
+| Caller → service | Permitted operation | Authority scope and enforcement |
 |---|---|---|
-| API → Notes | Create/list/read (and search for the CWE-89 test surface) | Signed short-lived authority; subject and action checked; Notes checks owner |
-| API → Report | Generate a text report | Signed authority, active subject, exact selected note IDs |
-| Report → Notes | Read selected notes only | Forwarded API-signed note-specific authority; Report cannot mint grants |
-| Other caller/action | Deny | Missing, invalid, wrong-audience, expired, wrong-action, or out-of-scope authority fails closed |
+| API → Notes | Create | Subject-bound `note:create` on `new-note`; Notes obtains owner from verified authority |
+| API → Notes | List | Subject-bound `note:list` on `collection`; Notes filters by that subject |
+| API → Notes | Read | `note:read` for exact note UUID; Notes independently matches note owner |
+| API → Report | Generate | `report:create` bound to subject, username and digest of exact authorized input records |
+| Other caller/action | Deny | Missing, invalid, expired, wrong-audience, wrong-action, or wrong-resource authority rejected |
 
-The Report Service has no direct database access. The helper package has no independent service authority.
+API and each service share a different HMAC key for that service boundary. Report receives note data only after API has fetched it through Notes; Report has neither a Notes key nor direct database access.

@@ -2,22 +2,20 @@
 
 ## Boundaries
 
-- **TB1 Client → API:** untrusted credentials, access token, note input, IDs, and report request. API authenticates, checks active status/role, and validates input.
-- **TB2 API → Notes:** trusted service process carrying short-lived user/action/resource authority. Notes verifies the grant and independently enforces owner equality.
-- **TB3 API → Report:** report request, selected IDs, and bounded service authority. Report verifies caller/audience/action and may act only on the authorized selection.
-- **TB4 Report → Notes:** forwarded API-signed read authority for each selected note. Notes still performs the ownership check; Report cannot mint authority.
-- **TB5 Each service → its SQLite file:** separate process/storage ownership; no service directly opens another service's database.
-- **TB6 Helper/dependencies → build/runtime:** helper is a separate installed dependency; review and dependency analysis occur before tests/release.
+- **TB1 Client → API:** credentials, opaque bearer session, note content and UUIDs are untrusted. API validates identity, account status, role, and request shape.
+- **TB2 API → Notes:** API sends a short-lived HMAC-authenticated authority. Notes verifies subject, caller, audience, action, resource, issue time and expiry and independently filters data by owner.
+- **TB3 API → Report:** API sends only Notes-authorized records and a grant bound to their exact input digest, subject and username. Report verifies the grant and formats those records only.
+- **TB4 Services → SQLite:** API and Notes open only their own SQLite database. Report has no database connection.
+- **TB5 Helper/dependencies → build/runtime:** Report imports the separately installable helper; dependency installation and scanning are planned for CI.
 
 ## Report sequence
 
-1. Alice or Bob logs into API and receives a short-lived access token.
-2. User sends POST /reports with note UUIDs to API.
-3. API authenticates the active ordinary user, validates the selection, and issues Report-scoped report:create authority plus exact Notes note:read authorities for that user and those IDs.
-4. API calls Report over HTTP. Report verifies its authority and rejects IDs outside the selection.
-5. Report calls Notes over HTTP for each selected UUID, forwarding the corresponding narrowly scoped authority.
-6. Notes verifies caller, action, audience, expiry, and scope, then filters the row by both UUID and authenticated owner. A foreign or missing note is denied.
-7. Report sends only returned notes to the installed helper, then returns the formatted text to API.
-8. API returns the response to the authenticated user.
+1. User authenticates at API; API checks active status on every later request.
+2. User supplies note IDs to `POST /reports`.
+3. API obtains each note from Notes under a per-note `note:read` grant bound to that user and ID.
+4. Notes rejects missing, malformed, expired, wrong-audience, wrong-action, or wrong-resource grants, then returns only a row matching both ID and owner.
+5. API calculates a digest over the exact returned note IDs and content and sends those records to Report under a short-lived `report:create` grant.
+6. Report checks subject/username and the report-input digest before formatting with the helper.
+7. API returns the result to the same authenticated caller.
 
-A report cache that ignores the user and returns a prior user's result would cross TB1–TB4 and is the planned composition experiment. The secure design does not reuse a cached report across subjects.
+In the local demonstration all services bind to loopback and use HTTP. A deployment outside the local host requires authenticated TLS and stronger operational key management.
